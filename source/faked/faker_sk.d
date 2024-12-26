@@ -1,26 +1,3 @@
-module faked.faker_sk;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_en;
-
-class Faker_sk : Faker_en {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override string companyNamePattern() {
 		switch(uniform(0, 2, this.rnd)) {
 			case 0: return personLastName() ~ " " ~ companySuffix();

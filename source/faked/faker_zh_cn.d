@@ -1,26 +1,3 @@
-module faked.faker_zh_cn;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_en;
-
-class Faker_zh_cn : Faker_en {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override Airline airlineAirline() {
 		switch(uniform(0, 119, this.rnd)) {
 			case 0: return Airline(nullable(q"{爱琴海航空公司}"), nullable(q"{A3}"));

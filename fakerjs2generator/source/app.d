@@ -11,6 +11,7 @@ import std.json;
 import parser;
 import defis;
 import generator;
+import generator_pg;
 
 void main() {
 	genCustomTypes();
@@ -32,6 +33,8 @@ void main() {
 			.array
 			.sort!((a,b) => a.name < b.name)
 			.array;
+	auto pg = File("pg.sql", "w");
+	genTopMatterPGGlobal(pg.lockingTextWriter());
 
 	foreach(j; entries) {
 		string[] dummy;
@@ -41,13 +44,18 @@ void main() {
 		backFillMergeArray(jf);
 		string langName = j.name[0 .. $ - 5];
 		langs ~= langName;
-		auto f = File(format("../source/faked/faker_%s.d", langName.toLower()), "w");
-		genTopMatter(jf, f.lockingTextWriter(), langName, false);
-		generate(jf, langName, jf.data, f.lockingTextWriter(), [], methodsOfLang);
-		if(langName == "en") {
-			traverseMustachAAs(jf.data, enumFileLTW, []);
+		{
+			auto f = File(format("../source/faked/faker_%s.d", langName.toLower()), "w");
+			generate(jf, langName, jf.data, f.lockingTextWriter(), [], methodsOfLang);
+			if(langName == "en") {
+				traverseMustachAAs(jf.data, enumFileLTW, []);
+			}
+			f.writeln("}");
 		}
-		f.writeln("}");
+		{
+			genTopMatterPG(jf, pg.lockingTextWriter(), langName, false);
+			generatePG(jf, langName, jf.data, pg.lockingTextWriter(), [], methodsOfLang);
+		}
 	}
 	generateForward(bs, en, langs);
 	string[] funcs = ([ "companyName", "internetEmoji", "locationCity"

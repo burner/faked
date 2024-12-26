@@ -1,26 +1,3 @@
-module faked.faker_zh_tw;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_en;
-
-class Faker_zh_tw : Faker_en {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override string dateMonthWide() {
 		const string[] strs =
 		[ q"{1月}", q"{2月}", q"{3月}", q"{4月}", q"{5月}", q"{6月}", q"{7月}", q"{8月}", q"{9月}", q"{10月}"

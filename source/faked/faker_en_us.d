@@ -1,26 +1,3 @@
-module faked.faker_en_us;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_en;
-
-class Faker_en_us : Faker_en {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override string internetDomainSuffix() {
 		const string[] strs =
 		[ q"{com}", q"{us}", q"{biz}", q"{info}", q"{name}", q"{net}", q"{org}" ];

@@ -1,8 +1,11 @@
 module helper;
 
+import std.array;
 import std.algorithm.searching : canFind, endsWith, startsWith;
 import std.algorithm.iteration : filter, joiner, map, splitter;
 import std.file : exists, readText;
+import std.exception;
+import std.format;
 import std.stdio;
 import std.range : empty;
 import std.conv : to;
@@ -99,4 +102,68 @@ string camelCase(const string input, dchar[] separaters = ['_']) {
 	}
 
 	return output;
+}
+
+string toFirstUpper(string s) {
+	enforce(!s.empty);
+	string ret = s[0].toUpper().to!string() ~ s[1 .. $];
+	return ret;
+}
+
+void iformat(Out,Args...)(ref Out o, size_t indent, string f, Args args) {
+	foreach(_; 0 .. indent) {
+		o.put('\t');
+	}
+	formattedWrite(o, f, args);
+}
+
+void str80(Out)(ref Out o, string[] strs, size_t tabs) {
+	size_t curStrCount;
+	size_t curLength = tabs * 4;
+	size_t curLineCount = 0;
+	foreach(idx, s; strs) {
+		if(curStrCount == 0) {
+			if(idx > 0) {
+				o.put(", ");
+				curLength += 2;
+			}
+			o.put("q\"{");
+			o.put(s);
+			o.put("}\"");
+			curLength += s.length + 2;
+			++curStrCount;
+		} else {
+			if(curLength > 80) {
+				curLength = tabs * 4;
+				o.put('\n');
+				foreach(_; 0 .. tabs) {
+					o.put('\t');
+				}
+				curStrCount = 0;
+			}
+			if(idx > 0) {
+				o.put(", ");
+				curLength += 2;
+			}
+			o.put("q\"{");
+			o.put(s);
+			o.put("}\"");
+			curLength += s.length + 2;
+		}
+	}
+}
+
+string pathToFuncName(string[] path) {
+	path = path.map!(p => p.splitter("_"))
+		.joiner
+		.filter!(it => !it.empty)
+		.array;
+	enforce(path.length > 1, to!string(path));
+	string ret = path[0];
+	foreach(it; path[1 .. $]) {
+		char up = to!char(it[0].toUpper());
+		string ta = up ~ it[1 .. $];
+		ret ~= ta;
+	}
+	return ret;
 }

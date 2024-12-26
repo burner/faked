@@ -1,26 +1,3 @@
-module faked.faker_nb_no;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_en;
-
-class Faker_nb_no : Faker_en {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override string commerceDepartment() {
 		const string[] strs =
 		[ q"{Barn}", q"{Bøker}", q"{Dagligvarer}", q"{Datamaskiner}", q"{Elektronikk}", q"{Filmer}", q"{Hage og utemiljø}"

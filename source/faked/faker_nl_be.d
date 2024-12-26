@@ -1,26 +1,3 @@
-module faked.faker_nl_be;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_nl;
-
-class Faker_nl_be : Faker_nl {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override string companySuffix() {
 		const string[] strs =
 		[ q"{NV}", q"{BVBA}", q"{CVBA}", q"{VZW}" ];

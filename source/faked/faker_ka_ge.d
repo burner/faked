@@ -1,26 +1,3 @@
-module faked.faker_ka_ge;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_en;
-
-class Faker_ka_ge : Faker_en {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override string cellPhoneFormats() {
 		const string[] strs =
 		[ q"{(+995 32) 2-##-##-##}", q"{032-2-##-##-##}", q"{032-2-######}", q"{032-2-###-###}"

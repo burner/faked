@@ -1,26 +1,3 @@
-module faked.faker_da;
-
-import std.algorithm : map, joiner;
-import std.array;
-import std.conv : to;
-import std.exception : enforce;
-import std.format;
-import std.random;
-import std.range : iota, take, repeat;
-import std.string : toUpper;
-import std.typecons : Nullable, nullable;
-
-import faked.customtypes;
-import faked.fakerenums;
-
-import faked.faker_en;
-
-class Faker_da : Faker_en {
-@safe:
-	this(int seed) {
-		super(seed);
-	}
-
 	override string commerceProductDescription() {
 		const string[] strs =
 		[ q"{Apollotech B340 er en prisbillig trådløs mus med pålidelig forbindelse, 12 måneders batterilevetid og moderne design}"
