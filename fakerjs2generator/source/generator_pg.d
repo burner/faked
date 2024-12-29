@@ -353,7 +353,13 @@ VALUES ('%s', '%s', ARRAY[%--(%s, %)]);
 			, lang);
 	iformat(o, 0, "AS $$\n");
 	iformat(o, 0, "BEGIN\n");
-	iformat(o, 1, "RETURN random_string_select('%s', '%s');\n", ret, lang);
+	string[] langs = [ lang ] ~ jf.chain;
+	if(langs[$ -1 ] == "base") {
+		langs = langs[0 .. $ - 1];
+	}
+	iformat(o, 1, "RETURN random_string_select(ARRAY[%--(%s, %)], '%s');\n"
+			, langs.map!(l => "$g$" ~ l ~ "$g$")
+			, ret);
 	iformat(o, 0, "END\n");
 	iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n");
 
@@ -445,7 +451,7 @@ void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus) {
 	while(idx != -1) {
 		string interme = line[cur .. idx];
 		if(!interme.empty) {
-			o.put((cnt == 0 ? "" : " || ") ~ "'" ~ interme ~ "'" ~ "");
+			o.put((cnt == 0 ? "" : " || ") ~ "$g$" ~ interme ~ "$g$" ~ "");
 			++cnt;
 		}
 		ptrdiff_t close = line.indexOf("}}", idx);
