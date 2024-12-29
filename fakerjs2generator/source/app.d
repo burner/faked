@@ -1,9 +1,10 @@
 import std.array;
 import std.stdio;
-import std.algorithm.iteration : filter, uniq;
+import std.algorithm.iteration : filter, map, uniq;
 import std.algorithm.sorting : sort;
 import std.file : DirEntry, dirEntries, SpanMode, readText;
 import std.string : lastIndexOf;
+import std.typecons : tuple;
 import std.uni : toLower;
 import std.format;
 import std.json;
@@ -35,6 +36,11 @@ void main() {
 			.array;
 	auto pg = File("../pg.sql", "w");
 	genTopMatterPGGlobal(pg.lockingTextWriter());
+	JsonFile[string] jfs;
+	jfs["en"] = en;
+	genTopMatterPG(en, pg.lockingTextWriter(), "en", false);
+	generatePG(en, "en", en.data, pg.lockingTextWriter(), [], methodsOfLang);
+	generatePG(bs, "en", bs.data, pg.lockingTextWriter(), [], methodsOfLang);
 
 	foreach(j; entries) {
 		string[] dummy;
@@ -43,6 +49,7 @@ void main() {
 		writeln(j.name, " ", jf.chain);
 		backFillMergeArray(jf);
 		string langName = j.name[0 .. $ - 5];
+		jfs[langName] = jf;
 		langs ~= langName;
 		{
 			auto f = File(format("../source/faked/faker_%s.d", langName.toLower()), "w");
@@ -71,8 +78,18 @@ void main() {
 		.array
 		.uniq
 		.array;
+
+	bool[string] funcsAA = funcs.map!(f => tuple(f, true)).assocArray();
+
 	generateUnittest(bs, en, langs, funcs);
 	generatePackage(langs);
+	foreach(j; entries) {
+		string langName = j.name[0 .. $ - 5];
+		auto ltw = pg.lockingTextWriter();
+		assert(langName in methodsOfLang, j.name);
+		genLateBindingsPG(ltw, langName, methodsOfLang[langName]
+				, funcsAA, jfs[langName]);
+	}
 	//pg.writeln("\n\nCOMMIT;\n");
 }
 

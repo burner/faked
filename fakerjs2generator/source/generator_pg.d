@@ -107,6 +107,30 @@ $$ LANGUAGE 'plpgsql' STABLE;
 }
 
 void genTopMatterPG(Out)(ref JsonFile jf, auto ref Out o, const string language, const bool base) {
+	if(language != "en") {
+		return;
+	}
+
+	string[][] toReplace =
+		[ [ "locationStreet_en", "locationStreetPattern_en"]
+		, [ "locationCity_en", "locationCityPattern_en"]
+		, [ "personJobDescriptor_en", "personTitleDescriptor_en"]
+		, [ "personJobType_en", "personTitleJob_en"]
+		, [ "personJobArea_en", "personTitleLevel_en"]
+		, [ "companyName_en", "companyNamePattern_en"]
+		];
+
+	foreach(it; toReplace) {
+	iformat(o, 0, `
+DROP FUNCTION IF EXISTS %1$s;
+CREATE OR REPLACE FUNCTION %2$s() RETURNS TEXT
+AS $$
+BEGIN
+	RETURN %2$s();
+END
+$$ LANGUAGE 'plpgsql' STABLE;
+`,  it[0], it[1]);
+	}
 }
 
 void generatePG(Out)(JsonFile jf, const string langName, Language lang, auto ref Out o, string[] path
@@ -184,136 +208,13 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path) {
 }
 
 void generatePackagePG(string[] langs) {
-	auto f = File("../source/faked/package.d", "w");
-	f.writefln(`module faked;
-
-public import faked.customtypes;
-public import faked.fakerenums;
-public import faked.faker_base;
-public import faked.faker_en;
-` ~ "%--(public import faked.faker_%s;\n%);\n", langs.map!(l => l.toLower()));
 }
 
 void generateUnittestPG(JsonFile bs, JsonFile en, string[] langs, string[] funcs) {
-	auto f = File("../source/faked/tests.d", "w");
-	f.writefln(`module faked.tests;
-
-import faked.customtypes;
-import faked.fakerenums;
-import faked.fakerforwarder;
-import faked.faker_base;
-import faked.faker_en;
-` ~ "%--(import faked.faker_%s;\n%);\n", langs.map!(l => l.toLower()));
-
-	foreach(l; langs.map!(it => it.toLower())) {
-		f.writefln(`
-unittest {
-	auto f = new Faker_%s(13);
-`, l);
-		auto ltw = f.lockingTextWriter();
-		foreach(fu; funcs) {
-			iformat(ltw, 1, "foreach(i; 0 .. 4) {\n");
-			iformat(ltw, 2, "f.%s();\n", fu);
-			iformat(ltw, 1, "}\n");
-		}
-		f.writeln("}");
-	}
-	f.writefln(`
-unittest {
-	auto f = new FakerForwarder(13);
-`);
-	auto ltw = f.lockingTextWriter();
-	foreach(fu; funcs) {
-		iformat(ltw, 1, "foreach(i; 0 .. 4) {\n");
-		iformat(ltw, 2, "f.%s();\n", fu);
-		iformat(ltw, 1, "}\n");
-	}
-	f.writeln("}");
 }
 
 void generateForwardPG(JsonFile bs, JsonFile en, string[] langs) {
-	auto f = File("../source/faked/fakerforwarder.d", "w");
-	f.writefln(`module faked.fakerforwarder;
-
-import std.random;
-
-import faked.customtypes;
-import faked.fakerenums;
-import faked.faker_en;
-` ~ "%--(%s\n%)" ~ `
-
-class FakerForwarder {
-@safe:
-	Random rnd;
-	Faker_en[] toPassThrough = [ ` ~ "%--(%s, %)" ~ ` ];
-
-	this(int seed = 1338) {
-		this.rnd = Random(seed);
-	}
-
-	string companyName() {
-		return choice(this.toPassThrough, this.rnd).companyName();
-	}
-	final string internetEmoji() {
-		return choice(this.toPassThrough, this.rnd).internetEmoji();
-	}
-
-	final string locationCity() {
-		return choice(this.toPassThrough, this.rnd).locationCity();
-	}
-
-	final string personJobDescriptor() {
-		return choice(this.toPassThrough, this.rnd).personJobDescriptor();
-	}
-
-	final string personJobType() {
-		return choice(this.toPassThrough, this.rnd).personJobType();
-	}
-
-	final string personJobArea() {
-		return choice(this.toPassThrough, this.rnd).personJobArea();
-	}
-
-    final string companyCatchPhrase() {
-		return choice(this.toPassThrough, this.rnd).companyCatchPhrase();
-	}
-
-    final string phoneNumber() {
-		return choice(this.toPassThrough, this.rnd).phoneNumber();
-	}
-
-    final string loremText(size_t length = size_t.max) {
-		return choice(this.toPassThrough, this.rnd).loremText(length);
-	}
-
-    final string loremParagraphs(size_t length = size_t.max) {
-		return choice(this.toPassThrough, this.rnd).loremParagraphs(length);
-	}
-
-    final string loremParagraph(size_t length = size_t.max) {
-		return choice(this.toPassThrough, this.rnd).loremParagraph(length);
-	}
-
-    final string loremSentance(size_t length = size_t.max) {
-		return choice(this.toPassThrough, this.rnd).loremSentance(length);
-	}
-
-    final string loremSentances(size_t length = size_t.max) {
-		return choice(this.toPassThrough, this.rnd).loremSentances(length);
-	}
-`
-	, langs.map!(l => "import faked.faker_" ~ l.toLower() ~ ";")
-	, langs.map!(l => "new Faker_" ~ l.toLower() ~ "(1337)")
-	);
-
-	auto ltw = f.lockingTextWriter();
-	traverseFwdPG(bs.data, ltw, []);
-	traverseFwdPG(en.data, ltw, []);
-
-	f.writeln("}");
 }
-
-
 
 void traverseMustachAAsPG(T,Out)(T t, auto ref Out o, string[] path) {
 	static if(T.stringof.endsWith("Folder")
@@ -446,6 +347,15 @@ string genStringArrayPG(Out)(string[] strs, ref Out o, string[] path
 VALUES ('%s', '%s', ARRAY[%--(%s, %)]);
 `, lang, ret, strs.map!(s => "$$" ~ s ~ "$$"));
 
+	iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s_%s;\n", ret, lang);
+	iformat(o, 0, "CREATE OR REPLACE FUNCTION %s_%s() RETURNS TEXT\n", ret
+			, lang);
+	iformat(o, 0, "AS $$\n");
+	iformat(o, 0, "BEGIN\n");
+	iformat(o, 1, "RETURN random_string_select('%s', '%s');\n", ret, lang);
+	iformat(o, 0, "END\n");
+	iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n");
+
 	return ret;
 }
 
@@ -458,9 +368,9 @@ string genNumberPG(Out)(Number[] n, ref Out o, string[] path, string lang
 VALUES ('%s', '%s', ARRAY[%--(%s, %)]);
 `, lang, ret, n.map!(s => "$$" ~ s.num ~ "$$"));
 
-
-	iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s;\n", ret);
-	iformat(o, 0, "CREATE OR REPLACE FUNCTION %s() RETURNS TEXT\n", ret);
+	iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s_%s;\n", ret, lang);
+	iformat(o, 0, "CREATE OR REPLACE FUNCTION %s_%s() RETURNS TEXT\n", ret
+			, lang);
 	iformat(o, 0, "AS $$\n");
 	iformat(o, 1, "DECLARE strs TEXT[];\n");
 	iformat(o, 1, "    idx INTEGER;\n");
@@ -477,4 +387,27 @@ VALUES ('%s', '%s', ARRAY[%--(%s, %)]);
 	iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n");
 
 	return ret;
+}
+
+void genLateBindingsPG(Out)(ref Out o, string langName
+		, string[] methodsOfLang, bool[string] funcs, JsonFile jf)
+{
+	foreach(m; methodsOfLang) {
+		if(m in funcs) {
+			continue;
+		}
+
+		writefln("%s %s %s", langName, m, jf.chain);
+
+		iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s_%s;\n", m
+				, langName);
+		iformat(o, 0, "CREATE OR REPLACE FUNCTION %s_%s() RETURNS TEXT\n", m
+				, langName);
+		iformat(o, 0, "AS $$\n");
+		iformat(o, 0, "BEGIN\n");
+		iformat(o, 1, "RETURN %s_%s();\n", m, jf.chain[0]);
+
+		iformat(o, 0, "END\n");
+		iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n");
+	}
 }
