@@ -284,9 +284,10 @@ void traversePG(T,Out)(JsonFile jf, const string langName, T t, ref Out o, strin
 			methodsOfBaseClass[langName] ~= genStringArrayPG(t, o, path,
 					langName, overWrite, jf);
 			formattedWrite(o, "\n\n");
-		/*} else static if(is(T == Mustache[])) {
-			methodsOfBaseClass[langName] ~= genMustache(t, o, path, overWrite);
+		} else static if(is(T == Mustache[])) {
+			methodsOfBaseClass[langName] ~= genMustachePG(t, o, path, langName, overWrite);
 			formattedWrite(o, "\n\n");
+		/*
 		} else static if(is(T == Airplane[])) {
 			methodsOfBaseClass[langName] ~= genAirplane(t, o, path, overWrite);
 			formattedWrite(o, "\n\n");
@@ -410,4 +411,76 @@ void genLateBindingsPG(Out)(ref Out o, string langName
 		iformat(o, 0, "END\n");
 		iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n");
 	}
+}
+
+string genMustachePG(Out)(Mustache[] m, ref Out o, string[] path
+		, string lang
+		, const bool overWrite)
+{
+	string ret = pathToFuncName(path);
+	iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s_%s;\n", ret, lang);
+	iformat(o, 0, "CREATE OR REPLACE FUNCTION %s_%s() RETURNS TEXT\n", ret, lang);
+	iformat(o, 0, "AS $$\n");
+	iformat(o, 1, "DECLARE idx INTEGER;\n");
+	iformat(o, 0, "BEGIN\n");
+	iformat(o, 1, "idx = TRUNC(RANDOM() * %s);\n", m.length);
+	iformat(o, 1, "CASE idx\n");
+	foreach(idx, it; m) {
+		iformat(o, 2, "WHEN %s THEN RETURN ", idx);
+		buildSingleMustachePG(o, lang, it);
+		formattedWrite(o, ";\n");
+	}
+	iformat(o, 1, "END CASE;\n");
+	iformat(o, 1, "RETURN '';\n");
+	iformat(o, 0, "END;\n");
+	iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n");
+	return ret;
+}
+
+void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus) {
+	string line = mus.str.replace("\"", "\\\"");
+	ptrdiff_t idx = line.indexOf("{{");
+	ptrdiff_t cur = 0;
+	long cnt;
+	while(idx != -1) {
+		string interme = line[cur .. idx];
+		if(!interme.empty) {
+			o.put((cnt == 0 ? "" : " || ") ~ "'" ~ interme ~ "'" ~ "");
+			++cnt;
+		}
+		ptrdiff_t close = line.indexOf("}}", idx);
+		enforce(close != -1, line);
+		string musT = line[idx + 2 .. close];
+		if(musT.startsWith("number.int(") && musT.endsWith(")")) {
+			string musTJS = musT["number.int(".length .. $ - 1];
+			musTJS = musTJS.replace("\\\"", "\"");
+			JSONValue mm = parseJSON(musTJS);
+			//o.put(" ~ TRUNC(RANDOM()(" ~ mm["min"].get!int().to!string() ~ ", "
+			//	~ mm["min"].get!int().to!string() ~ ").to!string()");
+			o.put(" ~ TRUNC(RANDOM() * " ~ mm["min"].get!(int)().to!(string)()
+					~ ")");
+		} else {
+			//ret ~= (cnt == 0 ? "" : " ~ ") ~ line[idx + 2 .. close]
+			//	.replaceDotOrSection(section).camelCase() ~ "()";
+			o.put((cnt == 0 ? "" : " || ")
+					~ mustacheToFuncIdentiferPG(line[idx + 2 .. close], lang) ~ "()");
+		}
+		++cnt;
+		cur = close + 2;
+		idx = line.indexOf("{{", cur);
+	}
+	string rest = line[cur .. $];
+	if(!rest.empty) {
+		o.put((cnt == 0 ? "\"" : " ~ \"") ~ rest ~ "\"");
+	}
+}
+
+string mustacheToFuncIdentiferPG(string s, string lang) {
+	string[] as = s.splitter("_")
+		.map!(it => it.splitter("."))
+		.joiner
+		.array;
+	return (as.length < 2
+		? as[0]
+		: pathToFuncName(as)) ~ "_" ~ lang;
 }
