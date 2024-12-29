@@ -73,7 +73,7 @@ void main() {
 		.array;
 	generateUnittest(bs, en, langs, funcs);
 	generatePackage(langs);
-	pg.writeln("\n\nCOMMIT;\n");
+	//pg.writeln("\n\nCOMMIT;\n");
 }
 
 JsonFile buildBase(Out)(string fn, ref string[][string] methodsOfBaseClass

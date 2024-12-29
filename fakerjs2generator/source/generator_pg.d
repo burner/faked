@@ -20,7 +20,7 @@ import helper;
 import defis;
 
 void genTopMatterPGGlobal(Out)(auto ref Out o) {
-	iformat(o, 0, "BEGIN TRANSACTION;\n\n");
+	//iformat(o, 0, "BEGIN TRANSACTION;\n\n");
 	iformat(o, 0, "DROP TABLE IF EXISTS Strings;\n");
 	iformat(o, 0, `CREATE TABLE Strings (
 	name TEXT NOT NULL,
@@ -82,6 +82,27 @@ $$ LANGUAGE 'plpgsql';
 CREATE OR REPLACE FUNCTION isdigit(text) RETURNS BOOLEAN AS '
 select $1 ~ ''^(-)?[0-9]+$'' as result
 ' LANGUAGE SQL;
+
+DROP FUNCTION IF EXISTS random_string_select;
+CREATE OR REPLACE FUNCTION random_string_select(lang_chain TEXT[], field TEXT) RETURNS TEXT
+AS $$
+DECLARE strs TEXT[];
+    idx INTEGER;
+	l TEXT;
+BEGIN
+	FOREACH l IN ARRAY lang_chain LOOP
+		SELECT strings INTO strs
+		  FROM Strings AS S
+		 WHERE S.lang = l AND S.name = field;
+
+		IF ARRAY_LENGTH(strs, 1) > 0 THEN
+			idx = TRUNC(RANDOM() * ARRAY_LENGTH(strs, 1) + 1);
+			RETURN strs[idx];
+		END IF;
+	END LOOP;
+	RETURN '';
+END
+$$ LANGUAGE 'plpgsql' STABLE;
 `);
 }
 
@@ -359,7 +380,8 @@ void traversePG(T,Out)(JsonFile jf, const string langName, T t, ref Out o, strin
 		const string funcName = pathToFuncNamePG(path);
 		const bool overWrite = shouldOverridePG(funcName, jf.chain, methodsOfBaseClass);
 		static if(is(T == string[])) {
-			methodsOfBaseClass[langName] ~= genStringArrayPG(t, o, path, langName, overWrite);
+			methodsOfBaseClass[langName] ~= genStringArrayPG(t, o, path,
+					langName, overWrite, jf);
 			formattedWrite(o, "\n\n");
 		/*} else static if(is(T == Mustache[])) {
 			methodsOfBaseClass[langName] ~= genMustache(t, o, path, overWrite);
@@ -390,7 +412,8 @@ void traversePG(T,Out)(JsonFile jf, const string langName, T t, ref Out o, strin
 			formattedWrite(o, "\n\n");
 		*/
 		} else static if(is(T == Number[])) {
-			methodsOfBaseClass[langName] ~= genNumberPG(t, o, path, langName, overWrite);
+			methodsOfBaseClass[langName] ~= genNumberPG(t, o, path, langName,
+					overWrite, jf);
 			formattedWrite(o, "\n\n");
 		} else {
 			writefln("Unhandled %s", T.stringof);
@@ -415,7 +438,8 @@ string pathToFuncNamePG(string[] path) {
 
 string genStringArrayPG(Out)(string[] strs, ref Out o, string[] path
 		, string lang
-		, const bool overWrite)
+		, const bool overWrite
+		, JsonFile jf)
 {
 	string ret = pathToFuncNamePG(path);
 	iformat(o, 0, `INSERT INTO Strings(lang, name, strings)
@@ -426,7 +450,8 @@ VALUES ('%s', '%s', ARRAY[%--(%s, %)]);
 }
 
 string genNumberPG(Out)(Number[] n, ref Out o, string[] path, string lang
-		, const bool overWrite)
+		, const bool overWrite
+		, JsonFile jf)
 {
 	string ret = pathToFuncName(path);
 	iformat(o, 0, `INSERT INTO Strings(lang, name, strings)
