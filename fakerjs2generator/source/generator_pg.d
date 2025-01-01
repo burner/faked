@@ -139,7 +139,7 @@ void generatePG(Out)(JsonFile jf, const string langName, Language lang, auto ref
 	traversePG(jf, langName, lang, o, path, methodsOfBaseClass);
 }
 
-void traverseFwdPG(T,Out)(T t, ref Out o, string[] path) {
+void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 	static if(T.stringof.endsWith("Folder")
 			|| is(T == Language)
 			|| is(T == Product_Name)
@@ -148,11 +148,11 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path) {
 			|| is(T == DateMonth))
 	{
 		static foreach(string mem; [FieldNameTuple!(T)].filter!(m => !m.empty)) {{
-			traverseFwdPG(__traits(getMember, t, mem), o, path ~ mem);
+			traverseFwdPG(__traits(getMember, t, mem), o, path ~ mem, langs);
 		}}
 	} else static if(is(T == Nullable!F, F)) {
 		if(!t.isNull()) {
-			traverseFwdPG(t.get(), o, path);
+			traverseFwdPG(t.get(), o, path, langs);
 		}
 	} else {
 		string ptfn = pathToFuncNamePG(path);
@@ -213,7 +213,9 @@ void generatePackagePG(string[] langs) {
 void generateUnittestPG(JsonFile bs, JsonFile en, string[] langs, string[] funcs) {
 }
 
-void generateForwardPG(JsonFile bs, JsonFile en, string[] langs) {
+void generateForwardPG(Out)(ref Out o, JsonFile bs, JsonFile en, string[] langs) {
+	traverseFwdPG(bs.data, o, [], langs);
+	traverseFwdPG(en.data, o, [], langs);
 }
 
 void traverseMustachAAsPG(T,Out)(T t, auto ref Out o, string[] path) {

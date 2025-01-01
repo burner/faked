@@ -131,6 +131,9 @@ void genPG() {
 		genLateBindingsPG(ltw, langName, methodsOfLang[langName]
 				, funcsAA, jfs[langName]);
 	}
+
+	auto ltw = pg.lockingTextWriter();
+	generateForwardPG(ltw, bs, en, langs);
 }
 
 void main() {
