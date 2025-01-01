@@ -306,13 +306,14 @@ void traversePG(T,Out)(JsonFile jf, const string langName, T t, ref Out o, strin
 		} else static if(is(T == Airline[])) {
 			methodsOfBaseClass[langName] ~= genAirline(t, o, path, overWrite);
 			formattedWrite(o, "\n\n");
-		} else static if(is(T == MustacheWeight[])) {
-			methodsOfBaseClass[langName] ~= genMustacheWeight(t, o, path, overWrite);
-			formattedWrite(o, "\n\n");
 		} else static if(is(T == Mustache[string])) {
-			methodsOfBaseClass[langName] ~= genMustacheAA(t, o, path, overWrite);
+			methodsOfBaseClass[langName] ~= genMustacheAAPG(t, o, path, overWrite);
 			formattedWrite(o, "\n\n");
 		*/
+		} else static if(is(T == MustacheWeight[])) {
+			methodsOfBaseClass[langName] ~= genMustacheWeightPG(t, o, path
+					, langName, overWrite);
+			formattedWrite(o, "\n\n");
 		} else static if(is(T == Number[])) {
 			methodsOfBaseClass[langName] ~= genNumberPG(t, o, path, langName,
 					overWrite, jf);
@@ -443,6 +444,33 @@ string genMustachePG(Out)(Mustache[] m, ref Out o, string[] path
 	return ret;
 }
 
+string genMustacheWeightPG(Out)(MustacheWeight[] m, ref Out o, string[] path
+		, string lang
+		, const bool overWrite)
+{
+	string ret = pathToFuncName(path);
+	int max = m.map!(it => it.weight).fold!((a, b) => a + b);
+	int begin = 0;
+
+	iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s_%s;\n", ret, lang);
+	iformat(o, 0, "CREATE OR REPLACE FUNCTION %s_%s() RETURNS TEXT\n", ret, lang);
+	iformat(o, 0, "AS $$\n");
+	iformat(o, 1, "DECLARE idx INTEGER;\n");
+	iformat(o, 0, "BEGIN\n");
+	iformat(o, 1, "idx = TRUNC(RANDOM() * %s);\n", max);
+	foreach(idx, it; m) {
+		iformat(o, 2, "IF idx >= %s AND idx < %s THEN RETURN ", begin
+			, it.weight + begin);
+		buildSingleMustachePG(o, lang, it.value);
+		formattedWrite(o, "; END IF;\n");
+		begin += it.weight;
+	}
+	iformat(o, 1, "RETURN '';\n");
+	iformat(o, 0, "END;\n");
+	iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n");
+	return ret;
+}
+
 void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus) {
 	string line = mus.str.replace("\"", "\\\"");
 	ptrdiff_t idx = line.indexOf("{{");
@@ -461,13 +489,9 @@ void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus) {
 			string musTJS = musT["number.int(".length .. $ - 1];
 			musTJS = musTJS.replace("\\\"", "\"");
 			JSONValue mm = parseJSON(musTJS);
-			//o.put(" ~ TRUNC(RANDOM()(" ~ mm["min"].get!int().to!string() ~ ", "
-			//	~ mm["min"].get!int().to!string() ~ ").to!string()");
 			o.put(" ~ TRUNC(RANDOM() * " ~ mm["min"].get!(int)().to!(string)()
 					~ ")");
 		} else {
-			//ret ~= (cnt == 0 ? "" : " ~ ") ~ line[idx + 2 .. close]
-			//	.replaceDotOrSection(section).camelCase() ~ "()";
 			o.put((cnt == 0 ? "" : " || ")
 					~ mustacheToFuncIdentiferPG(line[idx + 2 .. close], lang) ~ "()");
 		}

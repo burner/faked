@@ -14,7 +14,7 @@ import defis;
 import generator;
 import generator_pg;
 
-void main() {
+void genD() {
 	genCustomTypes();
 	string[][string] methodsOfLang;
 	methodsOfLang["base"] = [];
@@ -34,13 +34,6 @@ void main() {
 			.array
 			.sort!((a,b) => a.name < b.name)
 			.array;
-	auto pg = File("../pg.sql", "w");
-	genTopMatterPGGlobal(pg.lockingTextWriter());
-	JsonFile[string] jfs;
-	jfs["en"] = en;
-	genTopMatterPG(en, pg.lockingTextWriter(), "en", false);
-	generatePG(en, "en", en.data, pg.lockingTextWriter(), [], methodsOfLang);
-	generatePG(bs, "en", bs.data, pg.lockingTextWriter(), [], methodsOfLang);
 
 	foreach(j; entries) {
 		string[] dummy;
@@ -49,7 +42,6 @@ void main() {
 		writeln(j.name, " ", jf.chain);
 		backFillMergeArray(jf);
 		string langName = j.name[0 .. $ - 5];
-		jfs[langName] = jf;
 		langs ~= langName;
 		{
 			auto f = File(format("../source/faked/faker_%s.d", langName.toLower()), "w");
@@ -61,8 +53,6 @@ void main() {
 			f.writeln("}");
 		}
 		{
-			genTopMatterPG(jf, pg.lockingTextWriter(), langName, false);
-			generatePG(jf, langName, jf.data, pg.lockingTextWriter(), [], methodsOfLang);
 			if(langName == "en") {
 				traverseMustachAAs(jf.data, enumFileLTW, []);
 			}
@@ -83,6 +73,57 @@ void main() {
 
 	generateUnittest(bs, en, langs, funcs);
 	generatePackage(langs);
+}
+
+void genPG() {
+	auto pg = File("../pg.sql", "w");
+	string[][string] methodsOfLang;
+	methodsOfLang["base"] = [];
+	genTopMatterPGGlobal(pg.lockingTextWriter());
+	auto enumFile = File("../fakerenums.pg", "w");
+	auto enumFileLTW = enumFile.lockingTextWriter();
+	JsonFile bs = buildBase("base.json", methodsOfLang, enumFileLTW, true);
+	JsonFile en = buildBase("en.json", methodsOfLang, enumFileLTW, false);
+	JsonFile[string] jfs;
+	jfs["en"] = en;
+	genTopMatterPG(en, pg.lockingTextWriter(), "en", false);
+	generatePG(en, "en", en.data, pg.lockingTextWriter(), [], methodsOfLang);
+	generatePG(bs, "en", bs.data, pg.lockingTextWriter(), [], methodsOfLang);
+
+	string[] langs;
+	DirEntry[] entries = dirEntries("", "*.json", SpanMode.shallow)
+			.filter!(it => it.name != "dub.json")
+			.filter!(it => it.name != "base.json")
+			.filter!(it => it.name != "en.json")
+			.array
+			.sort!((a,b) => a.name < b.name)
+			.array;
+
+	foreach(j; entries) {
+		string[] dummy;
+		JSONValue jv = parseJSON(readText(j.name));
+		JsonFile jf = parseJson!(JsonFile)(jv, [j.name]);
+		writeln(j.name, " ", jf.chain);
+		backFillMergeArray(jf);
+		string langName = j.name[0 .. $ - 5];
+		jfs[langName] = jf;
+		langs ~= langName;
+
+		genTopMatterPG(jf, pg.lockingTextWriter(), langName, false);
+		generatePG(jf, langName, jf.data, pg.lockingTextWriter(), [], methodsOfLang);
+	}
+	string[] funcs = ([ "companyName", "internetEmoji", "locationCity"
+		, "personJobDescriptor", "personJobType", "personJobArea"
+		, "companyCatchPhrase", "phoneNumber", "loremText", "loremParagraphs"
+		, "loremParagraph", "loremSentance", "loremSentances" ]
+		~ methodsOfLang["base"] ~ methodsOfLang["en"])
+		.sort
+		.array
+		.uniq
+		.array;
+
+	bool[string] funcsAA = funcs.map!(f => tuple(f, true)).assocArray();
+
 	foreach(j; entries) {
 		string langName = j.name[0 .. $ - 5];
 		auto ltw = pg.lockingTextWriter();
@@ -90,7 +131,11 @@ void main() {
 		genLateBindingsPG(ltw, langName, methodsOfLang[langName]
 				, funcsAA, jfs[langName]);
 	}
-	//pg.writeln("\n\nCOMMIT;\n");
+}
+
+void main() {
+	//genD();
+	genPG();
 }
 
 JsonFile buildBase(Out)(string fn, ref string[][string] methodsOfBaseClass
