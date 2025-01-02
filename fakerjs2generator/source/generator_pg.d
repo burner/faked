@@ -124,6 +124,28 @@ BEGIN
 	RETURN '';
 END
 $$ LANGUAGE 'plpgsql' STABLE;
+
+DROP FUNCTION IF EXISTS random_random_number_build;
+CREATE OR REPLACE FUNCTION random_random_number_build(field TEXT) RETURNS TEXT
+AS $$
+DECLARE strs TEXT[];
+    idx INTEGER;
+	l TEXT;
+BEGIN
+	SELECT strings INTO strs
+	  FROM Strings AS S
+	 WHERE S.name = field
+	   AND ARRAY_LENGTH(S.strings, 1) > 0
+	 ORDER BY RANDOM()
+	 LIMIT 1;
+
+	IF ARRAY_LENGTH(strs, 1) > 0 THEN
+		idx = TRUNC(RANDOM() * ARRAY_LENGTH(strs, 1) + 1);
+		RETURN strs[idx];
+	END IF;
+	RETURN '';
+END
+$$ LANGUAGE 'plpgsql' STABLE;
 `);
 }
 
@@ -185,13 +207,22 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 			iformat(o, 1, "RETURN random_random_string_select('%s');\n", ptfn);
 			iformat(o, 0, "END\n");
 			iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n\n");
-			//iformat(o, 1, "final string %s() {\n", ptfn);
-			//iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
-			//		, ptfn);
-		/*} else static if(is(T == Mustache[])) {
-			iformat(o, 1, "final string %s() {\n", ptfn);
-			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
-					, ptfn);
+		} else static if(is(T == Mustache[])) {
+			iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s;\n", ptfn);
+			iformat(o, 0, "CREATE OR REPLACE FUNCTION %s() RETURNS TEXT\n", ptfn);
+			iformat(o, 0, "AS $$\n");
+			iformat(o, 1, "DECLARE idx INTEGER;\n");
+			iformat(o, 0, "BEGIN\n");
+			iformat(o, 1, "idx = TRUNC(RANDOM() * %s);\n", langs.length);
+			iformat(o, 1, "CASE idx\n");
+			foreach(idx, it; langs) {
+				iformat(o, 2, "WHEN %s THEN RETURN %s_%s();\n", idx, ptfn, it);
+			}
+			iformat(o, 1, "END CASE;\n");
+			iformat(o, 1, "RETURN '';\n");
+			iformat(o, 0, "END\n");
+			iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n\n");
+		/*
 		} else static if(is(T == Airplane[])) {
 			iformat(o, 1, "final Airplane %s() {\n", ptfn);
 			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
@@ -216,19 +247,31 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 			iformat(o, 1, "final Airline %s() {\n", ptfn);
 			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
 					, ptfn);
-		} else static if(is(T == MustacheWeight[])) {
-			iformat(o, 1, "final string %s() {\n", ptfn);
-			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
-					, ptfn);
-		} else static if(is(T == Mustache[string])) {
-			iformat(o, 1, "final string %s() {\n", ptfn);
-			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
-					, ptfn);
-		} else static if(is(T == Number[])) {
-			iformat(o, 1, "final string %s() {\n", ptfn);
-			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
-					, ptfn);
 		*/
+		} else static if(is(T == MustacheWeight[])) {
+			iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s;\n", ptfn);
+			iformat(o, 0, "CREATE OR REPLACE FUNCTION %s() RETURNS TEXT\n", ptfn);
+			iformat(o, 0, "AS $$\n");
+			iformat(o, 1, "DECLARE idx INTEGER;\n");
+			iformat(o, 0, "BEGIN\n");
+			iformat(o, 1, "idx = TRUNC(RANDOM() * %s);\n", langs.length);
+			iformat(o, 1, "CASE idx\n");
+			foreach(idx, it; langs) {
+				iformat(o, 2, "WHEN %s THEN RETURN %s_%s();\n", idx, ptfn, it);
+			}
+			iformat(o, 1, "END CASE;\n");
+			iformat(o, 1, "RETURN '';\n");
+			iformat(o, 0, "END\n");
+			iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n\n");
+		//} else static if(is(T == Mustache[string])) {
+		} else static if(is(T == Number[])) {
+			iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s;\n", ptfn);
+			iformat(o, 0, "CREATE OR REPLACE FUNCTION %s() RETURNS TEXT\n", ptfn);
+			iformat(o, 0, "AS $$\n");
+			iformat(o, 0, "BEGIN\n");
+			iformat(o, 1, "RETURN numberBuild(random_random_number_build('%s'));\n", ptfn);
+			iformat(o, 0, "END\n");
+			iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n\n");
 		} else {
 			writefln("Unhandled %s", T.stringof);
 		}
