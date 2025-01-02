@@ -103,6 +103,30 @@ BEGIN
 	RETURN '';
 END
 $$ LANGUAGE 'plpgsql' STABLE;
+
+DROP FUNCTION IF EXISTS random_random_string_select;
+CREATE OR REPLACE FUNCTION random_random_string_select(lang_chain TEXT[], field TEXT) RETURNS TEXT
+AS $$
+DECLARE strs TEXT[];
+    idx INTEGER;
+	l TEXT;
+BEGIN
+	SELECT array_agg(u ORDER BY RANDOM()) INTO lang_chain
+	  FROM UNNEST(lang_chain) AS u;
+
+	FOREACH l IN ARRAY lang_chain LOOP
+		SELECT strings INTO strs
+		  FROM Strings AS S
+		 WHERE S.lang = l AND S.name = field;
+
+		IF ARRAY_LENGTH(strs, 1) > 0 THEN
+			idx = TRUNC(RANDOM() * ARRAY_LENGTH(strs, 1) + 1);
+			RETURN strs[idx];
+		END IF;
+	END LOOP;
+	RETURN '';
+END
+$$ LANGUAGE 'plpgsql' STABLE;
 `);
 }
 
@@ -157,9 +181,9 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 	} else {
 		string ptfn = pathToFuncNamePG(path);
 		static if(is(T == string[])) {
-			iformat(o, 1, "final string %s() {\n", ptfn);
-			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
-					, ptfn);
+			//iformat(o, 1, "final string %s() {\n", ptfn);
+			//iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
+			//		, ptfn);
 		/*} else static if(is(T == Mustache[])) {
 			iformat(o, 1, "final string %s() {\n", ptfn);
 			iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
