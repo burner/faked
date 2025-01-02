@@ -84,6 +84,9 @@ void genPG() {
 	auto enumFileLTW = enumFile.lockingTextWriter();
 	JsonFile bs = buildBase("base.json", methodsOfLang, enumFileLTW, true);
 	JsonFile en = buildBase("en.json", methodsOfLang, enumFileLTW, false);
+	foreach(key, value; methodsOfLang) {
+		writefln("%s %s", key, value);
+	}
 	JsonFile[string] jfs;
 	jfs["en"] = en;
 	genTopMatterPG(en, pg.lockingTextWriter(), "en", false);
@@ -128,6 +131,7 @@ void genPG() {
 		string langName = j.name[0 .. $ - 5];
 		auto ltw = pg.lockingTextWriter();
 		assert(langName in methodsOfLang, j.name);
+		writefln("%s %s", langName, methodsOfLang[langName]);
 		genLateBindingsPG(ltw, langName, methodsOfLang[langName]
 				, funcsAA, jfs[langName]);
 	}

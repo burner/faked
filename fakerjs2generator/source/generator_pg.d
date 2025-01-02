@@ -273,7 +273,7 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 			iformat(o, 0, "END\n");
 			iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n\n");
 		} else {
-			writefln("Unhandled %s", T.stringof);
+			//writefln("Unhandled %s", T.stringof);
 		}
 	}
 }
@@ -353,13 +353,19 @@ void traversePG(T,Out)(JsonFile jf, const string langName, T t, ref Out o, strin
 	} else {
 		const string funcName = pathToFuncNamePG(path);
 		const bool overWrite = shouldOverridePG(funcName, jf.chain, methodsOfBaseClass);
+		string f;
 		static if(is(T == string[])) {
-			methodsOfBaseClass[langName] ~= genStringArrayPG(t, o, path,
-					langName, overWrite, jf);
-			formattedWrite(o, "\n\n");
+			f = genStringArrayPG(t, o, path, langName, overWrite, jf);
+			if(!f.empty) {
+				formattedWrite(o, "\n\n");
+				methodsOfBaseClass[langName] ~= f;
+			}
 		} else static if(is(T == Mustache[])) {
-			methodsOfBaseClass[langName] ~= genMustachePG(t, o, path, langName, overWrite);
-			formattedWrite(o, "\n\n");
+			f = genMustachePG(t, o, path, langName, jf ,overWrite);
+			if(!f.empty) {
+				formattedWrite(o, "\n\n");
+				methodsOfBaseClass[langName] ~= f;
+			}
 		/*
 		} else static if(is(T == Airplane[])) {
 			methodsOfBaseClass[langName] ~= genAirplane(t, o, path, overWrite);
@@ -384,15 +390,19 @@ void traversePG(T,Out)(JsonFile jf, const string langName, T t, ref Out o, strin
 			formattedWrite(o, "\n\n");
 		*/
 		} else static if(is(T == MustacheWeight[])) {
-			methodsOfBaseClass[langName] ~= genMustacheWeightPG(t, o, path
-					, langName, overWrite);
-			formattedWrite(o, "\n\n");
+			f = genMustacheWeightPG(t, o, path, langName, jf, overWrite);
+			if(!f.empty) {
+				formattedWrite(o, "\n\n");
+				methodsOfBaseClass[langName] ~= f;
+			}
 		} else static if(is(T == Number[])) {
-			methodsOfBaseClass[langName] ~= genNumberPG(t, o, path, langName,
-					overWrite, jf);
-			formattedWrite(o, "\n\n");
+			f = genNumberPG(t, o, path, langName, overWrite, jf);
+			if(!f.empty) {
+				methodsOfBaseClass[langName] ~= f;
+				formattedWrite(o, "\n\n");
+			}
 		} else {
-			writefln("Unhandled %s", T.stringof);
+			//writefln("Unhandled %s", T.stringof);
 		}
 	}
 }
@@ -444,6 +454,9 @@ string genNumberPG(Out)(Number[] n, ref Out o, string[] path, string lang
 		, const bool overWrite
 		, JsonFile jf)
 {
+	if(n.empty) {
+		return "";
+	}
 	string ret = pathToFuncName(path);
 	iformat(o, 0, `INSERT INTO Strings(lang, name, strings)
 VALUES ('%s', '%s', ARRAY[%--(%s, %)]);
@@ -477,8 +490,7 @@ void genLateBindingsPG(Out)(ref Out o, string langName
 		if(m in funcs) {
 			continue;
 		}
-
-		writefln("%s %s %s", langName, m, jf.chain);
+		writefln("Gen Late %s %s %s", langName, m, jf.chain);
 
 		iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s_%s;\n", m
 				, langName);
@@ -495,6 +507,7 @@ void genLateBindingsPG(Out)(ref Out o, string langName
 
 string genMustachePG(Out)(Mustache[] m, ref Out o, string[] path
 		, string lang
+		, ref JsonFile jf
 		, const bool overWrite)
 {
 	string ret = pathToFuncName(path);
@@ -507,7 +520,7 @@ string genMustachePG(Out)(Mustache[] m, ref Out o, string[] path
 	iformat(o, 1, "CASE idx\n");
 	foreach(idx, it; m) {
 		iformat(o, 2, "WHEN %s THEN RETURN ", idx);
-		buildSingleMustachePG(o, lang, it);
+		buildSingleMustachePG(o, lang, it, jf);
 		formattedWrite(o, ";\n");
 	}
 	iformat(o, 1, "END CASE;\n");
@@ -519,6 +532,7 @@ string genMustachePG(Out)(Mustache[] m, ref Out o, string[] path
 
 string genMustacheWeightPG(Out)(MustacheWeight[] m, ref Out o, string[] path
 		, string lang
+		, ref JsonFile jf
 		, const bool overWrite)
 {
 	string ret = pathToFuncName(path);
@@ -532,9 +546,8 @@ string genMustacheWeightPG(Out)(MustacheWeight[] m, ref Out o, string[] path
 	iformat(o, 0, "BEGIN\n");
 	iformat(o, 1, "idx = TRUNC(RANDOM() * %s);\n", max);
 	foreach(idx, it; m) {
-		iformat(o, 2, "IF idx >= %s AND idx < %s THEN RETURN ", begin
-			, it.weight + begin);
-		buildSingleMustachePG(o, lang, it.value);
+		iformat(o, 2, "IF idx >= %s AND idx < %s THEN RETURN ", begin, it.weight + begin);
+		buildSingleMustachePG(o, lang, it.value, jf);
 		formattedWrite(o, "; END IF;\n");
 		begin += it.weight;
 	}
@@ -544,7 +557,9 @@ string genMustacheWeightPG(Out)(MustacheWeight[] m, ref Out o, string[] path
 	return ret;
 }
 
-void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus) {
+void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus
+		, ref JsonFile jf)
+{
 	string line = mus.str.replace("\"", "\\\"");
 	ptrdiff_t idx = line.indexOf("{{");
 	ptrdiff_t cur = 0;
@@ -566,7 +581,7 @@ void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus) {
 					~ ")");
 		} else {
 			o.put((cnt == 0 ? "" : " || ")
-					~ mustacheToFuncIdentiferPG(line[idx + 2 .. close], lang) ~ "()");
+					~ mustacheToFuncIdentiferPG(line[idx + 2 .. close], lang, jf));
 		}
 		++cnt;
 		cur = close + 2;
@@ -578,12 +593,17 @@ void buildSingleMustachePG(Out)(ref Out o, string lang, Mustache mus) {
 	}
 }
 
-string mustacheToFuncIdentiferPG(string s, string lang) {
+string mustacheToFuncIdentiferPG(string s, string lang, ref JsonFile jf) {
 	string[] as = s.splitter("_")
 		.map!(it => it.splitter("."))
 		.joiner
 		.array;
+	//return (as.length < 2
+	//	? as[0]
+	//	: pathToFuncName(as)) ~ "_" ~ lang;
 	return (as.length < 2
-		? as[0]
-		: pathToFuncName(as)) ~ "_" ~ lang;
+			? as[0]
+			: format("random_string_select(ARRAY[%--(%s, %)], '%s')"
+				, ([ lang ] ~ jf.chain).map!(i => "$g$" ~ i ~ "$g$")
+				, pathToFuncName(as)));
 }
