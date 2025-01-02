@@ -105,25 +105,22 @@ END
 $$ LANGUAGE 'plpgsql' STABLE;
 
 DROP FUNCTION IF EXISTS random_random_string_select;
-CREATE OR REPLACE FUNCTION random_random_string_select(lang_chain TEXT[], field TEXT) RETURNS TEXT
+CREATE OR REPLACE FUNCTION random_random_string_select(field TEXT) RETURNS TEXT
 AS $$
 DECLARE strs TEXT[];
     idx INTEGER;
 	l TEXT;
 BEGIN
-	SELECT array_agg(u ORDER BY RANDOM()) INTO lang_chain
-	  FROM UNNEST(lang_chain) AS u;
+	SELECT strings INTO strs
+	  FROM Strings AS S
+	 WHERE S.name = field
+	 ORDER BY RANDOM()
+	 LIMIT 1;
 
-	FOREACH l IN ARRAY lang_chain LOOP
-		SELECT strings INTO strs
-		  FROM Strings AS S
-		 WHERE S.lang = l AND S.name = field;
-
-		IF ARRAY_LENGTH(strs, 1) > 0 THEN
-			idx = TRUNC(RANDOM() * ARRAY_LENGTH(strs, 1) + 1);
-			RETURN strs[idx];
-		END IF;
-	END LOOP;
+	IF ARRAY_LENGTH(strs, 1) > 0 THEN
+		idx = TRUNC(RANDOM() * ARRAY_LENGTH(strs, 1) + 1);
+		RETURN strs[idx];
+	END IF;
 	RETURN '';
 END
 $$ LANGUAGE 'plpgsql' STABLE;
@@ -181,6 +178,13 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 	} else {
 		string ptfn = pathToFuncNamePG(path);
 		static if(is(T == string[])) {
+			iformat(o, 0, "\nDROP FUNCTION IF EXISTS %s;\n", ptfn);
+			iformat(o, 0, "CREATE OR REPLACE FUNCTION %s() RETURNS TEXT\n", ptfn);
+			iformat(o, 0, "AS $$\n");
+			iformat(o, 0, "BEGIN\n");
+			iformat(o, 1, "RETURN random_random_string_select('%s');\n", ptfn);
+			iformat(o, 0, "END\n");
+			iformat(o, 0, "$$ LANGUAGE 'plpgsql' STABLE;\n\n");
 			//iformat(o, 1, "final string %s() {\n", ptfn);
 			//iformat(o, 2, "return choice(this.toPassThrough, this.rnd).%s();\n\t}\n\n"
 			//		, ptfn);
