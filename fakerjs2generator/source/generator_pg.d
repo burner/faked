@@ -484,10 +484,12 @@ VALUES ('%s', '%s', ARRAY[%--(%s, %)]);
 }
 
 void genLateBindingsPG(Out)(ref Out o, string langName
-		, string[] methodsOfLang, bool[string] funcs, JsonFile jf)
+		, bool[string] methodsOfLang, bool[string] funcs, JsonFile jf)
 {
-	foreach(m; methodsOfLang) {
-		if(m in funcs) {
+
+	foreach(m; funcs.keys()) {
+		if(m in methodsOfLang) {
+			writefln("NotGen Late %s %s", langName, m);
 			continue;
 		}
 		writefln("Gen Late %s %s %s", langName, m, jf.chain);
@@ -598,9 +600,6 @@ string mustacheToFuncIdentiferPG(string s, string lang, ref JsonFile jf) {
 		.map!(it => it.splitter("."))
 		.joiner
 		.array;
-	//return (as.length < 2
-	//	? as[0]
-	//	: pathToFuncName(as)) ~ "_" ~ lang;
 	return (as.length < 2
 			? as[0]
 			: format("random_string_select(ARRAY[%--(%s, %)], '%s')"

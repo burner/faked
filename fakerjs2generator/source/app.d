@@ -131,8 +131,11 @@ void genPG() {
 		string langName = j.name[0 .. $ - 5];
 		auto ltw = pg.lockingTextWriter();
 		assert(langName in methodsOfLang, j.name);
-		writefln("%s %s", langName, methodsOfLang[langName]);
-		genLateBindingsPG(ltw, langName, methodsOfLang[langName]
+		if(langName == "en_AU") {
+			writefln("%s %s", langName, methodsOfLang[langName]);
+		}
+		bool[string] funcsOfLang = methodsOfLang[langName].map!(f => tuple(f, true)).assocArray();
+		genLateBindingsPG(ltw, langName, funcsOfLang
 				, funcsAA, jfs[langName]);
 	}
 
