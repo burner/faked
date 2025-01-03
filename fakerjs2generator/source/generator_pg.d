@@ -19,6 +19,12 @@ import std.sumtype;
 import helper;
 import defis;
 
+struct JsonFileExt {
+	JsonFile jf;
+	string langName;
+	bool[string] methods;
+}
+
 void genTopMatterPGGlobal(Out)(auto ref Out o) {
 	//iformat(o, 0, "BEGIN TRANSACTION;\n\n");
 	iformat(o, 0, "DROP TABLE IF EXISTS Strings;\n");
@@ -182,7 +188,9 @@ void generatePG(Out)(JsonFile jf, const string langName, Language lang, auto ref
 	traversePG(jf, langName, lang, o, path, methodsOfBaseClass);
 }
 
-void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
+void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs
+		, JsonFileExt[string] langJFS)
+{
 	static if(T.stringof.endsWith("Folder")
 			|| is(T == Language)
 			|| is(T == Product_Name)
@@ -191,11 +199,12 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 			|| is(T == DateMonth))
 	{
 		static foreach(string mem; [FieldNameTuple!(T)].filter!(m => !m.empty)) {{
-			traverseFwdPG(__traits(getMember, t, mem), o, path ~ mem, langs);
+			traverseFwdPG(__traits(getMember, t, mem), o, path ~ mem, langs
+					, langJFS);
 		}}
 	} else static if(is(T == Nullable!F, F)) {
 		if(!t.isNull()) {
-			traverseFwdPG(t.get(), o, path, langs);
+			traverseFwdPG(t.get(), o, path, langs, langJFS);
 		}
 	} else {
 		string ptfn = pathToFuncNamePG(path);
@@ -254,9 +263,10 @@ void traverseFwdPG(T,Out)(T t, ref Out o, string[] path, string[] langs) {
 			iformat(o, 0, "AS $$\n");
 			iformat(o, 1, "DECLARE idx INTEGER;\n");
 			iformat(o, 0, "BEGIN\n");
-			iformat(o, 1, "idx = TRUNC(RANDOM() * %s);\n", langs.length);
+			string[] toChooseFrom = langs.filter!(l => ptfn in langJFS[l].methods).array;
+			iformat(o, 1, "idx = TRUNC(RANDOM() * %s);\n", toChooseFrom.length);
 			iformat(o, 1, "CASE idx\n");
-			foreach(idx, it; langs) {
+			foreach(idx, it; toChooseFrom) {
 				iformat(o, 2, "WHEN %s THEN RETURN %s_%s();\n", idx, ptfn, it);
 			}
 			iformat(o, 1, "END CASE;\n");
@@ -284,9 +294,11 @@ void generatePackagePG(string[] langs) {
 void generateUnittestPG(JsonFile bs, JsonFile en, string[] langs, string[] funcs) {
 }
 
-void generateForwardPG(Out)(ref Out o, JsonFile bs, JsonFile en, string[] langs) {
-	traverseFwdPG(bs.data, o, [], langs);
-	traverseFwdPG(en.data, o, [], langs);
+void generateForwardPG(Out)(ref Out o, JsonFile bs, JsonFile en, string[] langs
+		, JsonFileExt[string] langJFS)
+{
+	traverseFwdPG(bs.data, o, [], langs, langJFS);
+	traverseFwdPG(en.data, o, [], langs, langJFS);
 }
 
 void traverseMustachAAsPG(T,Out)(T t, auto ref Out o, string[] path) {

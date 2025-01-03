@@ -87,8 +87,7 @@ void genPG() {
 	foreach(key, value; methodsOfLang) {
 		writefln("%s %s", key, value);
 	}
-	JsonFile[string] jfs;
-	jfs["en"] = en;
+	JsonFileExt[string] jfs;
 	genTopMatterPG(en, pg.lockingTextWriter(), "en", false);
 	generatePG(en, "en", en.data, pg.lockingTextWriter(), [], methodsOfLang);
 	generatePG(bs, "en", bs.data, pg.lockingTextWriter(), [], methodsOfLang);
@@ -109,11 +108,14 @@ void genPG() {
 		writeln(j.name, " ", jf.chain);
 		backFillMergeArray(jf);
 		string langName = j.name[0 .. $ - 5];
-		jfs[langName] = jf;
+
 		langs ~= langName;
 
 		genTopMatterPG(jf, pg.lockingTextWriter(), langName, false);
 		generatePG(jf, langName, jf.data, pg.lockingTextWriter(), [], methodsOfLang);
+		jfs[langName] = JsonFileExt(jf, langName
+				, methodsOfLang[langName].map!(f => tuple(f, true)).assocArray()
+			);
 	}
 	string[] funcs = ([ "companyName", "internetEmoji", "locationCity"
 		, "personJobDescriptor", "personJobType", "personJobArea"
@@ -126,6 +128,7 @@ void genPG() {
 		.array;
 
 	bool[string] funcsAA = funcs.map!(f => tuple(f, true)).assocArray();
+	jfs["en"] = JsonFileExt(en, "en", funcsAA);
 
 	foreach(j; entries) {
 		string langName = j.name[0 .. $ - 5];
@@ -136,11 +139,11 @@ void genPG() {
 		}
 		bool[string] funcsOfLang = methodsOfLang[langName].map!(f => tuple(f, true)).assocArray();
 		genLateBindingsPG(ltw, langName, funcsOfLang
-				, funcsAA, jfs[langName]);
+				, funcsAA, jfs[langName].jf);
 	}
 
 	auto ltw = pg.lockingTextWriter();
-	generateForwardPG(ltw, bs, en, langs);
+	generateForwardPG(ltw, bs, en, langs, jfs);
 }
 
 void main() {
